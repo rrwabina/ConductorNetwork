@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import SimpleITK as sitk
 
 
-
+''' 
+Simple ITK-based visualization and preprocessing processes
+'''
 def sigmoid_mapping(image, curve_steepness = 0.01, output_min = 0, output_max = 1.0, intensity_midpoint = None):
     '''
     Map the image using a sigmoid function.
