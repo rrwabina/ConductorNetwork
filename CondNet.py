@@ -203,7 +203,7 @@ class Cond(nn.Module):
         x = torch.concat((x[:, :, :10, :10], skipC[:, :, :10, :10]))            #(08, 10, 10)
         x = self.decoderD(x)                                                    #(04, 12, 12)
         x = torch.concat((x[:, :, :12, :12], skipD[:, :, :12, :12]))            #(04, 12, 12) 
-        x = self.decoderE(x)                                                    #(02, 14, 14)
+        x = self.decoderE(x)                                                    #(02, 14, 14) #Should output (1, 256, 256)
  
         return x
         
