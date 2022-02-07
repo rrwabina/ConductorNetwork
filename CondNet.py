@@ -209,5 +209,42 @@ class Cond(nn.Module):
         x = self.decoderE(x)                                                    #(02, 14, 14) #Should output (1, 256, 256)
  
         return x
+
+class Cond1(nn.Module):
+    def __init__(self):
+        super(Cond, self).__init__()
+        self.encoder = EncoderTrack()
+
+        self.decoderA = DecoderTrackA()
+        self.decoderB = DecoderTrackB()
+        self.decoderC = DecoderTrackC()
+        self.decoderD = DecoderTrackD()
+        self.decoderE = DecoderTrackE()
+
+        self.sub_encoderD = EncoderSubTrackD()
+        self.sub_encoderC = EncoderSubTrackC()
+        self.sub_encoderB = EncoderSubTrackB()
+        self.sub_encoderA = EncoderSubTrackA()
+
+    def forward(self, a):
+        x = self.encoder(a)
+        x = torch.concat((self.encoder(a), self.encoder(a)))
+        x = self.decoderA(x)                                                      
+
+        skipA = torch.concat((self.sub_encoderD(a), self.sub_encoderD(a)))      
+        skipB = torch.concat((self.sub_encoderC(a), self.sub_encoderC(a)))      
+        skipC = torch.concat((self.sub_encoderB(a), self.sub_encoderB(a)))      
+        skipD = torch.concat((self.sub_encoderA(a), self.sub_encoderA(a)))        
+
+        x = torch.concat((x, skipA[:, :, :228, :228]))            
+        x = self.decoderB(x)                                                    
+        x = torch.concat((x, skipB[:, :, :223, :223]))            
+        x = self.decoderC(x)                                                    
+        x = torch.concat((x, skipC[:, :, :218, :218]))            
+        x = self.decoderD(x)                                                    
+        x = torch.concat((x, skipD[:, :, :213, :213]))             
+        x = self.decoderE(x)                                                    
+ 
+        return x
         
 # summary(Cond(), (1, 256, 256))
