@@ -4,6 +4,7 @@ from typing import List, Dict
 
 
 # Check the concatentions skip connections
+# TO DO: Change image channels 
 
 class CnvMod(nn.Module):
     def __init__(self, input_channel, output_channel):
