@@ -5,84 +5,68 @@ import torch.nn as nn
 from segmentation_models.condnet.module import EncMod, DecMod, CnvMod, Map 
 
 from typing import List, Dict
-
-class EncoderTrack(nn.Module): 
-    ''' U = 2 inputs, V = 1 output, I = 6 depth '''
+class EncoderTrack(nn.Module):
     def __init__(self):
         super(EncoderTrack, self).__init__()
         self.encodermodules = nn.ModuleList([
-            EncMod(1 if i == 0 else 2 ** (i + 1), 2 ** (i + 2)) for i in range(0, 6) 
+            EncMod(1 if i == 0 else 2 ** (i + 1), 2 ** (i + 2)) for i in range(0, 5)
         ])
-        self.decodermodule = DecMod(128, 256)
-        self.encodermodule = EncMod(128, 256)
+        self.decodermodule = DecMod(64, 64)
+        self.encodermodule = EncMod(64, 128)
 
-    def encoder_track(self, x: List[torch.Tensor]) -> torch.Tensor:
-        out = []
+    def encoder_track(self, x):
         for encoder in self.encodermodules:
             x = encoder(x)
-            out.append(x)
-        return out
+        return self.encodermodule(self.decodermodule(x))
+    
+    def forward(self, x):
+        return torch.concat((self.encoder_track(x), self.encoder_track(x)))
 
-    def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
-        return self.encoder_track(x) #Check if there exists a mapping
+class EncoderSubTrack(nn.Module):
+    def __init__(self, num):
+        super(EncoderSubTrack, self).__init__()
+        self.encodermodules = nn.ModuleList([
+            EncMod(1 if i == 0 else 2 ** (i + 1), 2 ** (i + 2)) for i in range(0, num) 
+        ])
+    def encoder_track(self, x):
+        for encoder in self.encodermodules:
+            x = encoder(x)
+        return x
+    def forward(self, x):
+        return torch.concat((self.encoder_track(x), self.encoder_track(x)))
 
 class DecoderTrack(nn.Module):
-    ''' U = 2 inputs, V = 1 output, I = 6 depth '''
     def __init__(self):
         super(DecoderTrack, self).__init__()
-        self.convmodules = nn.ModuleList([
-            CnvMod(64 if i == 2 else 2 ** (i + 3), 2 ** (i + 2)) for i in range(2, 0, -1)
-        ])
-        self.decodermodules = nn.ModuleList([
-            DecMod(2 ** (j + 2), 1 if j == 1 else 2 ** (j + 1)) for j in range(2, 1, -1)
-        ])
-        self.map = Map(input_channel = 8, output_channel = 1)
+        self.convmodules = nn.ModuleList([ 
+            CnvMod(128 if i == 5 else 2 ** (i + 1), 2 ** (i + 2)) for i in range(5, 0, -1)
+            ])
+        self.decodermodules = nn.ModuleList([ 
+            DecMod(2 ** (i + 2), 2 ** (i + 1)) for i in range(5, 0, -1)
+            ])
+        self.map = nn.ModuleList([ 
+            Map(2 ** (i + 1), 2 ** (i)) for i in range(5, 0, -1)
+            ])
+        self.sub_encoder = nn.ModuleList([
+            EncoderSubTrack(i) for i in range(4, 0, -1)
+            ])
+        self.idx = range(5, 0, -1)
 
-    def decoder_track(self, x: List[torch.Tensor]) -> torch.Tensor:
-        # inp = x.pop()
-        for conv, decoder in zip(self.convmodules, self.decodermodules):
-            inp = decoder(conv(x))
-        return inp
-
-    def forward(self, x):
-        for _ in range(0, 4):
-            output = self.map(self.decoder_track(x))
-        return output
-
+    def forward(self, out, x):
+        for cnv, dec, mp, sub in zip(self.convmodules, self.decodermodules, self.map, self.sub_encoder):
+            out = mp(dec(cnv(out)))
+            res = sub(x)
+            out = torch.concat((out, res[:, :, : out.shape[2], : out.shape[2]]))
+        return out
+        
 class CondNet(nn.Module):
     def __init__(self):
         super(CondNet, self).__init__()
-        self.encoders = nn.ModuleList([
-            EncoderTrack() for _ in range(0, 2)
-        ])
-        self.decoders = nn.ModuleList([
-            DecoderTrack() for _ in range(0, 5)
-        ]) 
-        self.base_decoder = DecMod(256, 256)
+        self.encoder = EncoderTrack()
+        self.decoder = DecoderTrack()
 
-    def encoder_track(self, x: torch.Tensor) -> List[torch.Tensor]:
-        out = []
-        for encoder in self.encoders:
-            x = encoder(x)
-            out.append(x)
-        out.append(self.base_decoder(out.pop()))
+    def forward(self, x):
+        out = self.encoder(x)
+        out = self.decoder(out, x)                 
         return out
 
-    def forward(self, x: torch.Tensor):
-        encoder_outputs = self.encoder_track(x)
-        return self.decoders(encoder_outputs)
-
-class CondNetSimulation(nn.Module):
-    def __init__(self):
-        super(CondNetSimulation, self).__init__()
-        self.encodertrack = EncoderTrack()
-        self.decodertrack = DecoderTrack()
-        
-        self.decoders = nn.ModuleList([DecoderTrack() for _ in range(0, 6)])
-
-    def forward(self, input1, input2):
-        input1 = self.encodertrack(input1) 
-        input2 = self.encodertrack(input2) 
-        
-        concat = torch.cat((input1[3], input2[3]), dim = 1)
-        return self.decodertrack(concat) 
