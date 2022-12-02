@@ -1,4 +1,4 @@
-# condnet
+# Conductor Network
 Implementation of Conductor Network for deep learning-based conductivity estimation
 
 This code implements CondNet [1] in Pytorch
